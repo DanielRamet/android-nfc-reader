@@ -1,0 +1,16 @@
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+
+# Google Services
+google-services.json
+
+# Log / temp
+*.log
