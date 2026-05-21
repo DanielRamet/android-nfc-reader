@@ -13,9 +13,11 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -32,6 +34,12 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private String readerId;
 
+    private boolean isProcessing = false;
+    private String lastUid = "";
+    private long lastScanTime = 0;
+    private static final long SCAN_COOLDOWN_MS = 3000;
+    private RelativeLayout loadingOverlay;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,52 +50,90 @@ public class MainActivity extends AppCompatActivity {
         tvScanDetails = findViewById(R.id.tvScanDetails);
         btnSimulate = findViewById(R.id.btnSimulate);
         rootLayout = findViewById(R.id.rootLayout);
+        loadingOverlay = findViewById(R.id.loadingOverlay);
 
         db = FirebaseFirestore.getInstance();
+        FirebaseAuth.getInstance().signInAnonymously()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        tvLastScan.setText("Auth OK");
+                    } else {
+                        tvLastScan.setText("Auth ERROR");
+                    }
+                });
+
         readerId = Build.MANUFACTURER + " " + Build.MODEL;
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+        if (nfcAdapter == null) {
+            Toast.makeText(this, "NFC no soportado", Toast.LENGTH_LONG).show();
+        }
 
         // Botón de simulación
         btnSimulate.setOnClickListener(view -> {
-            String randomUid = generateRandomUid();
-            processScan(randomUid);
+            String[] testUids = {
+                    "TEST_UID_1",
+                    "TEST_UID_2",
+                    "TEST_UID_3"
+            };
+            String uid = testUids[new Random().nextInt(testUids.length)];
+            processScan(uid);
         });
-    }
-
-    private String generateRandomUid() {
-        Random rnd = new Random();
-        int num = rnd.nextInt(30);
-        return "bracelet_" + num;
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent != null && NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_TECH_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
+
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
+
                 byte[] id = tag.getId();
+
                 StringBuilder sb = new StringBuilder();
-                for (byte b : id) sb.append(String.format("%02X", b));
+
+                for (byte b : id) {
+                    sb.append(String.format("%02X", b));
+                }
+
+                loadingOverlay.setVisibility(View.VISIBLE);
                 processScan(sb.toString());
             }
         }
     }
 
     private void processScan(final String uid) {
-        final DocumentReference docRef = db.collection("scans").document(uid);
-        docRef.get().addOnSuccessListener(documentSnapshot -> {
-            long newCount = 1;
-            String name = "Unknown";
+        long now = System.currentTimeMillis();
 
-            if (documentSnapshot.exists()) {
-                Long count = documentSnapshot.getLong("count");
-                if (count != null) newCount = count + 1;
-                String dbName = documentSnapshot.getString("name");
-                if (dbName != null) name = dbName;
-            } else {
-                name = generateRandomName();
+        if (uid.equals(lastUid) && (now - lastScanTime) < SCAN_COOLDOWN_MS) {
+            return;
+        }
+
+        lastUid = uid;
+        lastScanTime = now;
+
+        if (isProcessing) return;
+        isProcessing = true;
+
+        final DocumentReference docRef = db.collection("scans").document(uid);
+
+        docRef.get().addOnSuccessListener(documentSnapshot -> {
+
+            if (!documentSnapshot.exists()) {
+                // 🔴 UID NUEVO → pedir nombre
+                promptForName(uid);
+                return;
             }
+
+            // 🟢 UID EXISTENTE → incrementar contador
+            Long count = documentSnapshot.getLong("count");
+            String name = documentSnapshot.getString("name");
+
+            long newCount = (count != null) ? count + 1 : 1;
 
             Map<String, Object> data = new HashMap<>();
             data.put("uid", uid);
@@ -96,13 +142,60 @@ public class MainActivity extends AppCompatActivity {
             data.put("lastScan", System.currentTimeMillis());
             data.put("readerId", readerId);
 
-            String finalName = name;
-            long finalNewCount = newCount;
-            docRef.set(data).addOnSuccessListener(unused -> showEventMessage(finalName, uid, finalNewCount));
+            docRef.set(data).addOnSuccessListener(unused -> {
+                showEventMessage(name, uid, newCount);
+                isProcessing = false;
+
+            });
         });
     }
 
+    private void promptForName(String uid) {
+
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Nuevo chip detectado");
+
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("Nombre (opcional)");
+        builder.setView(input);
+
+        builder.setPositiveButton("Guardar", (dialog, which) -> {
+
+            String name = input.getText().toString().trim();
+
+            if (name.isEmpty()) {
+                name = generateRandomName();
+            }
+
+            long count = 0;
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("uid", uid);
+            data.put("name", name);
+            data.put("count", count);
+            data.put("lastScan", System.currentTimeMillis());
+            data.put("readerId", readerId);
+
+            final String finalName = name;
+
+            db.collection("scans").document(uid)
+                    .set(data)
+                    .addOnSuccessListener(unused ->  {
+                        showEventMessage(finalName, uid, count);
+                        isProcessing = false;
+                    });
+        });
+
+        builder.setNegativeButton("Cancelar", (dialog, which) -> {
+            loadingOverlay.setVisibility(View.GONE);
+            isProcessing = false;
+            dialog.cancel();
+        });
+        builder.show();
+    }
+
     private void showEventMessage(String name, String uid, long count) {
+        loadingOverlay.setVisibility(View.GONE);
         tvScanMessage.setText("✔ OK! Conteo: " + count);
         tvScanMessage.setVisibility(View.VISIBLE);
 
@@ -130,8 +223,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if (nfcAdapter != null) {
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                    this, 0, new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
+            PendingIntent pendingIntent;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                pendingIntent = PendingIntent.getActivity(
+                        this,
+                        0,
+                        new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                        PendingIntent.FLAG_MUTABLE
+                );
+            } else {
+                pendingIntent = PendingIntent.getActivity(
+                        this,
+                        0,
+                        new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                        0
+                );
+            }
+
             IntentFilter[] filters = new IntentFilter[]{};
             String[][] techList = new String[][]{};
             nfcAdapter.enableForegroundDispatch(this, pendingIntent, filters, techList);
