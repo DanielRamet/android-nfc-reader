@@ -9,6 +9,7 @@ import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.RelativeLayout;
@@ -17,6 +18,8 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.security.ProviderInstaller;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -44,6 +47,33 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Actualizar el proveedor SSL para corregir el error de ALPN en gRPC/SSL
+        ProviderInstaller.installIfNeededAsync(this, new ProviderInstaller.ProviderInstallListener() {
+            @Override
+            public void onProviderInstalled() {
+                // El motor SSL moderno ya está activo para gRPC / Firebase
+                Log.d("SSLProvider", "Proveedor de seguridad SSL actualizado correctamente.");
+            }
+
+            @Override
+            public void onProviderInstallFailed(int errorCode, Intent recoveryIntent) {
+                Log.e("SSLProvider", "Error al actualizar el proveedor SSL: " + errorCode);
+
+                // 1. Mostrar diálogo de recuperación si Google Play Services requiere interacción del usuario
+                GoogleApiAvailability availability = GoogleApiAvailability.getInstance();
+                if (availability.isUserResolvableError(errorCode)) {
+                    availability.showErrorDialogFragment(MainActivity.this, errorCode, 1, dialog -> {
+                        // El usuario cerró el diálogo de recuperación
+                    });
+                } else {
+                    // 2. Si no es resoluble, notificar que el dispositivo puede no ser compatible
+                    Toast.makeText(MainActivity.this,
+                            "Dispositivo no compatible con las conexiones SSL avanzadas de Firebase.",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+        });
 
         tvLastScan = findViewById(R.id.tvLastScan);
         tvScanMessage = findViewById(R.id.tvScanMessage);
