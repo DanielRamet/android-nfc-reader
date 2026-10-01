@@ -36,7 +36,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvScanDetails;
 
     private TextView tvWelcome;
-    private TextView tvWelcomeSubtitle;
+    private TextView tvWelcomeSubtitle1;
+    private TextView tvWelcomeSubtitle2;
+    private View layoutScanResult;
 
     private RelativeLayout rootLayout;
     private RelativeLayout loadingOverlay;
@@ -62,12 +64,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-
-
         // ====================================================
         // Actualizar proveedor SSL
         // ====================================================
-
         ProviderInstaller.installIfNeededAsync(
                 this,
                 new ProviderInstaller.ProviderInstallListener() {
@@ -125,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
 
         rootLayout = findViewById(R.id.rootLayout);
 
-        tvLastScan = findViewById(R.id.tvLastScan);
+        //tvLastScan = findViewById(R.id.tvLastScan);
 
         tvScanMessage = findViewById(R.id.tvScanMessage);
 
@@ -135,10 +134,12 @@ public class MainActivity extends AppCompatActivity {
 
         tvWelcome = findViewById(R.id.tvWelcome);
 
-        tvWelcomeSubtitle = findViewById(R.id.tvWelcomeSubtitle);
+        tvWelcomeSubtitle1 = findViewById(R.id.tvWelcomeSubtitle1);
+        tvWelcomeSubtitle2 = findViewById(R.id.tvWelcomeSubtitle2);
 
         loadingOverlay = findViewById(R.id.loadingOverlay);
 
+        layoutScanResult = findViewById(R.id.layoutScanResult);
 
         // ====================================================
         // Firebase
@@ -204,7 +205,6 @@ public class MainActivity extends AppCompatActivity {
         // ====================================================
         // Estado inicial
         // ====================================================
-
         showWelcomeScreen();
     }
 
@@ -212,21 +212,10 @@ public class MainActivity extends AppCompatActivity {
     // ========================================================
     // PANTALLA INICIAL
     // ========================================================
-
     private void showWelcomeScreen() {
-
-        // Mostrar mensaje de bienvenida
         layoutWelcome.setVisibility(View.VISIBLE);
-
-        // Ocultar resultado anterior
-        tvScanMessage.setVisibility(View.GONE);
-
-        tvScanDetails.setVisibility(View.GONE);
-
-        // Ocultar pantalla de carga
+        layoutScanResult.setVisibility(View.GONE);
         loadingOverlay.setVisibility(View.GONE);
-
-        // Fondo normal
         rootLayout.setBackgroundResource(R.drawable.bg_initial);
     }
 
@@ -616,78 +605,25 @@ public class MainActivity extends AppCompatActivity {
     // MOSTRAR RESULTADO
     // ========================================================
 
-    private void showEventMessage(
-            String name,
-            String uid,
-            long count) {
+    private void showEventMessage(String name, String uid, long count) {
+        layoutWelcome.setVisibility(View.GONE);
+        loadingOverlay.setVisibility(View.GONE);
 
+        // Mostrar contenedor con el Chibi y resultado
+        layoutScanResult.setVisibility(View.VISIBLE);
 
-        // Ocultar pantalla inicial
-        layoutWelcome.setVisibility(
-                View.GONE
-        );
+        // Texto verde neón brillante (#00FF88)
+        tvScanMessage.setText("✔ OK!\nConteo: " + count);
+        tvScanMessage.setTextColor(Color.parseColor("#00FF88"));
 
+        // Texto blanco brillante (#FFFFFF) sobre tarjeta oscura
+        tvScanDetails.setText(name + "\n\nUID: " + uid);
+        tvScanDetails.setTextColor(Color.WHITE);
 
-        // Ocultar loading
-        loadingOverlay.setVisibility(
-                View.GONE
-        );
+        //tvLastScan.setText("Último conteo: " + count);
 
-
-        // ----------------------------------------------------
-        // Mensaje OK
-        // ----------------------------------------------------
-
-        tvScanMessage.setText(
-                "✔ OK!\nConteo: " + count
-        );
-
-        tvScanMessage.setVisibility(
-                View.VISIBLE
-        );
-
-
-        // ----------------------------------------------------
-        // Nombre + UID
-        // ----------------------------------------------------
-
-        tvScanDetails.setText(
-                name
-                        + "\n\nUID: "
-                        + uid
-        );
-
-        tvScanDetails.setVisibility(
-                View.VISIBLE
-        );
-
-
-        // ----------------------------------------------------
-        // Último conteo
-        // ----------------------------------------------------
-
-        tvLastScan.setText(
-                "Último conteo: " + count
-        );
-
-
-        // ----------------------------------------------------
-        // Fondo
-        // ----------------------------------------------------
-        rootLayout.setBackgroundColor(Color.parseColor("#1B3B2B"));
-
-        // ----------------------------------------------------
-        // Después de 3 segundos volver a inicio
-        // ----------------------------------------------------
-
-        handler.postDelayed(
-                () -> {
-
-                    showWelcomeScreen();
-
-                },
-                3000
-        );
+        // Regresar a la pantalla de bienvenida tras 3 segundos
+        handler.postDelayed(this::showWelcomeScreen, 3000);
     }
 
 

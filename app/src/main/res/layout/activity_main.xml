@@ -3,95 +3,149 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp"
-    android:background="@android:color/white">
+    android:padding="20dp"
+    android:background="@drawable/bg_initial">
 
-    <!-- Contador histórico -->
-    <TextView
-        android:id="@+id/tvLastScan"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Último conteo: -"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"/>
+    <!-- Contador superior -->
+    <!-- <LinearLayout
+         android:id="@+id/topCounterCard"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:layout_alignParentTop="true"
+         android:layout_centerHorizontal="true"
+         android:layout_marginTop="16dp"
+         android:background="@drawable/bg_glass_card"
+         android:paddingHorizontal="24dp"
+         android:paddingVertical="12dp">
 
-    <!-- Mensaje inicial -->
-    <LinearLayout android:id="@+id/layoutWelcome"
+         <TextView
+             android:id="@+id/tvLastScan"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:text="Último conteo: -"
+             android:textColor="#00FF88"
+             android:textSize="20sp"
+             android:textStyle="bold" />
+    </LinearLayout>-->
+
+    <!-- PANTALLA INICIAL (BIENVENIDA) -->
+    <LinearLayout
+        android:id="@+id/layoutWelcome"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
+        android:background="@drawable/bg_glass_card"
         android:gravity="center"
-        android:orientation="vertical">
-        <TextView android:id="@+id/tvWelcome"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/chibi3" />
+
+        <TextView
+            android:id="@+id/tvWelcome"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="🍺 Escanea con tu bebida 🍺"
-            android:textSize="34sp"
-            android:textStyle="bold"
-            android:textColor="#222222"/>
-        <TextView android:id="@+id/tvWelcomeSubtitle"
+            android:text="🍻 ¡ BORRACHÓMETRO ! 🍻"
+            android:textColor="#FFD700"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvWelcomeSubtitle1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:gravity="center"
-            android:text="Acerca tu pulsera al lector"
-            android:textSize="20sp"
-            android:textColor="#777777"/>
+            android:text="Escanea con tu bebida"
+            android:textColor="#E0E0E0"
+            android:textSize="18sp" />
+        <TextView
+            android:id="@+id/tvWelcomeSubtitle2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Acerca tu pulsera NFC al lector"
+            android:textColor="#E0E0E0"
+            android:textSize="18sp" />
     </LinearLayout>
 
-    <!-- Mensaje de lectura grande -->
-    <TextView
-        android:id="@+id/tvScanMessage"
-        android:layout_width="wrap_content"
+    <!-- RESULTADO DEL ESCANEO (CHIBI + MENSAJE GRANDE) -->
+    <LinearLayout
+        android:id="@+id/layoutScanResult"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="48sp"
-        android:textColor="@android:color/holo_green_dark"
-        android:textStyle="bold"
-        android:gravity="center"
         android:layout_centerInParent="true"
-        android:visibility="gone"/>
+        android:background="@drawable/bg_glass_card"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:visibility="gone">
 
-    <!-- Nombre y UID de la pulsera -->
-    <TextView
-        android:id="@+id/tvScanDetails"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="28sp"
-        android:layout_below="@id/tvScanMessage"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="16dp"
-        android:visibility="gone"/>
+        <!-- Imagen Chibi al escanear -->
+        <ImageView
+            android:id="@+id/ivScanChibi"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/chibi3" />
 
-    <!-- Botón de simulación -->
-    <!--<Button
-        android:id="@+id/btnSimulate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Simular lectura"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="24dp"/> -->
+        <!-- Mensaje OK + Conteo en Verde Neón luminoso -->
+        <TextView
+            android:id="@+id/tvScanMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#00FF88"
+            android:textSize="40sp"
+            android:textStyle="bold" />
 
+        <!-- Nombre y detalles en Blanco brillante sobre el fondo oscuro -->
+        <TextView
+            android:id="@+id/tvScanDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- OVERLAY DE CARGA CON CHIBI -->
     <RelativeLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#AA000000"
+        android:background="#EE0D0E15"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/tvLoading"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Leyendo chip..."
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:layout_centerInParent="true"/>
+            android:layout_centerInParent="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="130dp"
+                android:layout_height="130dp"
+                android:layout_marginBottom="20dp"
+                android:src="@drawable/chibi3" />
+
+            <TextView
+                android:id="@+id/tvLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚡ Leyendo chip..."
+                android:textColor="#00FF88"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </RelativeLayout>
 </RelativeLayout>
