@@ -11,7 +11,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
 
     private NfcAdapter nfcAdapter;
     private TextView tvLastScan, tvScanMessage, tvScanDetails;
-    private Button btnSimulate;
+    //private Button btnSimulate;
     private RelativeLayout rootLayout;
     private FirebaseFirestore db;
     private String readerId;
@@ -78,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         tvLastScan = findViewById(R.id.tvLastScan);
         tvScanMessage = findViewById(R.id.tvScanMessage);
         tvScanDetails = findViewById(R.id.tvScanDetails);
-        btnSimulate = findViewById(R.id.btnSimulate);
+        //btnSimulate = findViewById(R.id.btnSimulate);
         rootLayout = findViewById(R.id.rootLayout);
         loadingOverlay = findViewById(R.id.loadingOverlay);
 
@@ -99,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Botón de simulación
-        btnSimulate.setOnClickListener(view -> {
+        /*btnSimulate.setOnClickListener(view -> {
             String[] testUids = {
                     "TEST_UID_1",
                     "TEST_UID_2",
@@ -108,6 +107,8 @@ public class MainActivity extends AppCompatActivity {
             String uid = testUids[new Random().nextInt(testUids.length)];
             processScan(uid);
         });
+
+         */
     }
 
     @Override
