@@ -3,6 +3,7 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Users/Daniel/AndroidStudioProjects/NFCReaderAppA40/app/src/main/res/drawable/ic_launcher_background.xml" value="0.207" />
         <entry key="..\:/Users/Daniel/AndroidStudioProjects/NFCReaderAppA40/app/src/main/res/layout/activity_main.xml" value="0.358695652173913" />
         <entry key="..\:/Users/Daniel/AndroidStudioProjects/NFCReaderAppA40/app/src/main/res/xml/nfc_tech_filter.xml" value="0.1" />
       </map>
