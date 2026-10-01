@@ -17,6 +17,31 @@
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"/>
 
+    <!-- Mensaje inicial -->
+    <LinearLayout android:id="@+id/layoutWelcome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView android:id="@+id/tvWelcome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="🍺 Escanea con tu bebida 🍺"
+            android:textSize="34sp"
+            android:textStyle="bold"
+            android:textColor="#222222"/>
+        <TextView android:id="@+id/tvWelcomeSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Acerca tu pulsera al lector"
+            android:textSize="20sp"
+            android:textColor="#777777"/>
+    </LinearLayout>
+
     <!-- Mensaje de lectura grande -->
     <TextView
         android:id="@+id/tvScanMessage"

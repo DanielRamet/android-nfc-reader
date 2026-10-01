@@ -30,256 +30,808 @@ import java.util.Random;
 public class MainActivity extends AppCompatActivity {
 
     private NfcAdapter nfcAdapter;
-    private TextView tvLastScan, tvScanMessage, tvScanDetails;
-    //private Button btnSimulate;
+
+    private TextView tvLastScan;
+    private TextView tvScanMessage;
+    private TextView tvScanDetails;
+
+    private TextView tvWelcome;
+    private TextView tvWelcomeSubtitle;
+
     private RelativeLayout rootLayout;
+    private RelativeLayout loadingOverlay;
+
+    private View layoutWelcome;
+
     private FirebaseFirestore db;
+
     private String readerId;
 
     private boolean isProcessing = false;
+
     private String lastUid = "";
     private long lastScanTime = 0;
+
     private static final long SCAN_COOLDOWN_MS = 3000;
-    private RelativeLayout loadingOverlay;
+
+    private final Handler handler = new Handler();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
 
-        // Actualizar el proveedor SSL para corregir el error de ALPN en gRPC/SSL
-        ProviderInstaller.installIfNeededAsync(this, new ProviderInstaller.ProviderInstallListener() {
-            @Override
-            public void onProviderInstalled() {
-                // El motor SSL moderno ya está activo para gRPC / Firebase
-                Log.d("SSLProvider", "Proveedor de seguridad SSL actualizado correctamente.");
-            }
 
-            @Override
-            public void onProviderInstallFailed(int errorCode, Intent recoveryIntent) {
-                Log.e("SSLProvider", "Error al actualizar el proveedor SSL: " + errorCode);
+        // ====================================================
+        // Actualizar proveedor SSL
+        // ====================================================
 
-                // 1. Mostrar diálogo de recuperación si Google Play Services requiere interacción del usuario
-                GoogleApiAvailability availability = GoogleApiAvailability.getInstance();
-                if (availability.isUserResolvableError(errorCode)) {
-                    availability.showErrorDialogFragment(MainActivity.this, errorCode, 1, dialog -> {
-                        // El usuario cerró el diálogo de recuperación
-                    });
-                } else {
-                    // 2. Si no es resoluble, notificar que el dispositivo puede no ser compatible
-                    Toast.makeText(MainActivity.this,
-                            "Dispositivo no compatible con las conexiones SSL avanzadas de Firebase.",
-                            Toast.LENGTH_LONG).show();
+        ProviderInstaller.installIfNeededAsync(
+                this,
+                new ProviderInstaller.ProviderInstallListener() {
+
+                    @Override
+                    public void onProviderInstalled() {
+
+                        Log.d(
+                                "SSLProvider",
+                                "Proveedor de seguridad SSL actualizado correctamente."
+                        );
+                    }
+
+                    @Override
+                    public void onProviderInstallFailed(
+                            int errorCode,
+                            Intent recoveryIntent) {
+
+                        Log.e(
+                                "SSLProvider",
+                                "Error al actualizar el proveedor SSL: "
+                                        + errorCode
+                        );
+
+                        GoogleApiAvailability availability =
+                                GoogleApiAvailability.getInstance();
+
+                        if (availability.isUserResolvableError(errorCode)) {
+
+                            availability.showErrorDialogFragment(
+                                    MainActivity.this,
+                                    errorCode,
+                                    1,
+                                    dialog -> {
+                                        // El usuario cerró el diálogo
+                                    }
+                            );
+
+                        } else {
+
+                            Toast.makeText(
+                                    MainActivity.this,
+                                    "Dispositivo no compatible con las conexiones SSL avanzadas de Firebase.",
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+                    }
                 }
-            }
-        });
+        );
+
+
+        // ====================================================
+        // Referencias del layout
+        // ====================================================
+
+        rootLayout = findViewById(R.id.rootLayout);
 
         tvLastScan = findViewById(R.id.tvLastScan);
+
         tvScanMessage = findViewById(R.id.tvScanMessage);
+
         tvScanDetails = findViewById(R.id.tvScanDetails);
-        //btnSimulate = findViewById(R.id.btnSimulate);
-        rootLayout = findViewById(R.id.rootLayout);
+
+        layoutWelcome = findViewById(R.id.layoutWelcome);
+
+        tvWelcome = findViewById(R.id.tvWelcome);
+
+        tvWelcomeSubtitle = findViewById(R.id.tvWelcomeSubtitle);
+
         loadingOverlay = findViewById(R.id.loadingOverlay);
 
+
+        // ====================================================
+        // Firebase
+        // ====================================================
+
         db = FirebaseFirestore.getInstance();
-        FirebaseAuth.getInstance().signInAnonymously()
+
+        FirebaseAuth.getInstance()
+                .signInAnonymously()
                 .addOnCompleteListener(task -> {
+
                     if (task.isSuccessful()) {
-                        tvLastScan.setText("Auth OK");
+
+                        Log.d(
+                                "FirebaseAuth",
+                                "Autenticación anónima correcta"
+                        );
+
                     } else {
-                        tvLastScan.setText("Auth ERROR");
+
+                        Log.e(
+                                "FirebaseAuth",
+                                "Error de autenticación",
+                                task.getException()
+                        );
+
+                        Toast.makeText(
+                                MainActivity.this,
+                                "Error de autenticación con Firebase",
+                                Toast.LENGTH_LONG
+                        ).show();
                     }
                 });
 
-        readerId = Build.MANUFACTURER + " " + Build.MODEL;
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+
+        // ====================================================
+        // Identificador del lector
+        // ====================================================
+
+        readerId =
+                Build.MANUFACTURER
+                        + " "
+                        + Build.MODEL;
+
+
+        // ====================================================
+        // NFC
+        // ====================================================
+
+        nfcAdapter =
+                NfcAdapter.getDefaultAdapter(this);
+
         if (nfcAdapter == null) {
-            Toast.makeText(this, "NFC no soportado", Toast.LENGTH_LONG).show();
+
+            Toast.makeText(
+                    this,
+                    "NFC no soportado",
+                    Toast.LENGTH_LONG
+            ).show();
         }
 
-        // Botón de simulación
-        /*btnSimulate.setOnClickListener(view -> {
-            String[] testUids = {
-                    "TEST_UID_1",
-                    "TEST_UID_2",
-                    "TEST_UID_3"
-            };
-            String uid = testUids[new Random().nextInt(testUids.length)];
-            processScan(uid);
-        });
 
-         */
+        // ====================================================
+        // Estado inicial
+        // ====================================================
+
+        showWelcomeScreen();
     }
+
+
+    // ========================================================
+    // PANTALLA INICIAL
+    // ========================================================
+
+    private void showWelcomeScreen() {
+
+        // Mostrar mensaje de bienvenida
+        layoutWelcome.setVisibility(View.VISIBLE);
+
+        // Ocultar resultado anterior
+        tvScanMessage.setVisibility(View.GONE);
+
+        tvScanDetails.setVisibility(View.GONE);
+
+        // Ocultar pantalla de carga
+        loadingOverlay.setVisibility(View.GONE);
+
+        // Fondo normal
+        rootLayout.setBackgroundColor(
+                Color.WHITE
+        );
+    }
+
+
+    // ========================================================
+    // NFC
+    // ========================================================
 
     @Override
     protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        if (intent == null) return;
-        String action = intent.getAction();
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) ||
-                NfcAdapter.ACTION_TECH_DISCOVERED.equals(action) ||
-                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
 
-            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        super.onNewIntent(intent);
+
+        if (intent == null) {
+            return;
+        }
+
+        String action =
+                intent.getAction();
+
+        if (
+                NfcAdapter.ACTION_TAG_DISCOVERED.equals(action)
+                        ||
+                        NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)
+                        ||
+                        NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)
+        ) {
+
+            Tag tag =
+                    intent.getParcelableExtra(
+                            NfcAdapter.EXTRA_TAG
+                    );
+
             if (tag != null) {
 
-                byte[] id = tag.getId();
+                byte[] id =
+                        tag.getId();
 
-                StringBuilder sb = new StringBuilder();
+                StringBuilder sb =
+                        new StringBuilder();
 
                 for (byte b : id) {
-                    sb.append(String.format("%02X", b));
+
+                    sb.append(
+                            String.format(
+                                    "%02X",
+                                    b
+                            )
+                    );
                 }
 
-                loadingOverlay.setVisibility(View.VISIBLE);
-                processScan(sb.toString());
+                String uid =
+                        sb.toString();
+
+
+                // Mostrar "Leyendo chip..."
+                loadingOverlay.setVisibility(
+                        View.VISIBLE
+                );
+
+                processScan(uid);
             }
         }
     }
 
-    private void processScan(final String uid) {
-        long now = System.currentTimeMillis();
 
-        if (uid.equals(lastUid) && (now - lastScanTime) < SCAN_COOLDOWN_MS) {
+    // ========================================================
+    // PROCESAR LECTURA
+    // ========================================================
+
+    private void processScan(final String uid) {
+
+        long now =
+                System.currentTimeMillis();
+
+
+        // ----------------------------------------------------
+        // Evitar lecturas duplicadas durante 3 segundos
+        // ----------------------------------------------------
+
+        if (
+                uid.equals(lastUid)
+                        &&
+                        (now - lastScanTime)
+                                < SCAN_COOLDOWN_MS
+        ) {
+
+            loadingOverlay.setVisibility(
+                    View.GONE
+            );
+
             return;
         }
+
 
         lastUid = uid;
         lastScanTime = now;
 
-        if (isProcessing) return;
+
+        // ----------------------------------------------------
+        // Evitar procesar dos lecturas simultáneamente
+        // ----------------------------------------------------
+
+        if (isProcessing) {
+            return;
+        }
+
         isProcessing = true;
 
-        final DocumentReference docRef = db.collection("scans").document(uid);
 
-        docRef.get().addOnSuccessListener(documentSnapshot -> {
+        // ----------------------------------------------------
+        // Buscar pulsera en Firestore
+        // ----------------------------------------------------
 
-            if (!documentSnapshot.exists()) {
-                // 🔴 UID NUEVO → pedir nombre
-                promptForName(uid);
-                return;
-            }
+        final DocumentReference docRef =
+                db.collection("scans")
+                        .document(uid);
 
-            // 🟢 UID EXISTENTE → incrementar contador
-            Long count = documentSnapshot.getLong("count");
-            String name = documentSnapshot.getString("name");
 
-            long newCount = (count != null) ? count + 1 : 1;
+        docRef.get()
+                .addOnSuccessListener(
+                        documentSnapshot -> {
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("uid", uid);
-            data.put("name", name);
-            data.put("count", newCount);
-            data.put("lastScan", System.currentTimeMillis());
-            data.put("readerId", readerId);
 
-            docRef.set(data).addOnSuccessListener(unused -> {
-                showEventMessage(name, uid, newCount);
-                isProcessing = false;
+                            // =================================================
+                            // PULSERA NUEVA
+                            // =================================================
 
-            });
-        });
+                            if (!documentSnapshot.exists()) {
+
+                                // Quitamos el overlay antes del diálogo
+                                loadingOverlay.setVisibility(
+                                        View.GONE
+                                );
+
+                                promptForName(uid);
+
+                                return;
+                            }
+
+
+                            // =================================================
+                            // PULSERA EXISTENTE
+                            // =================================================
+
+                            Long count =
+                                    documentSnapshot.getLong(
+                                            "count"
+                                    );
+
+                            String name =
+                                    documentSnapshot.getString(
+                                            "name"
+                                    );
+
+
+                            long newCount =
+                                    (count != null)
+                                            ? count + 1
+                                            : 1;
+
+
+                            // Si por algún motivo no tiene nombre
+                            if (
+                                    name == null
+                                            ||
+                                            name.trim().isEmpty()
+                            ) {
+
+                                name =
+                                        generateRandomName();
+                            }
+
+
+                            Map<String, Object> data =
+                                    new HashMap<>();
+
+
+                            data.put(
+                                    "uid",
+                                    uid
+                            );
+
+                            data.put(
+                                    "name",
+                                    name
+                            );
+
+                            data.put(
+                                    "count",
+                                    newCount
+                            );
+
+                            data.put(
+                                    "lastScan",
+                                    System.currentTimeMillis()
+                            );
+
+                            data.put(
+                                    "readerId",
+                                    readerId
+                            );
+
+
+                            // Guardar
+                            String finalName = name;
+                            docRef.set(data)
+                                    .addOnSuccessListener(
+                                            unused -> {
+
+                                                showEventMessage(
+                                                        finalName,
+                                                        uid,
+                                                        newCount
+                                                );
+
+                                                isProcessing =
+                                                        false;
+                                            }
+                                    )
+                                    .addOnFailureListener(
+                                            e -> {
+
+                                                showFirebaseError();
+
+                                                isProcessing =
+                                                        false;
+                                            }
+                                    );
+                        }
+                )
+                .addOnFailureListener(
+                        e -> {
+
+                            showFirebaseError();
+
+                            isProcessing =
+                                    false;
+                        }
+                );
     }
+
+
+    // ========================================================
+    // NUEVA PULSERA - PEDIR NOMBRE
+    // ========================================================
 
     private void promptForName(String uid) {
 
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Nuevo chip detectado");
+        android.app.AlertDialog.Builder builder =
+                new android.app.AlertDialog.Builder(
+                        this
+                );
 
-        final android.widget.EditText input = new android.widget.EditText(this);
-        input.setHint("Nombre (opcional)");
+
+        builder.setTitle(
+                "Nuevo chip detectado"
+        );
+
+
+        final android.widget.EditText input =
+                new android.widget.EditText(this);
+
+        input.setHint(
+                "Nombre (opcional)"
+        );
+
+
         builder.setView(input);
 
-        builder.setPositiveButton("Guardar", (dialog, which) -> {
 
-            String name = input.getText().toString().trim();
+        // ----------------------------------------------------
+        // GUARDAR
+        // ----------------------------------------------------
 
-            if (name.isEmpty()) {
-                name = generateRandomName();
-            }
+        builder.setPositiveButton(
+                "Guardar",
+                (dialog, which) -> {
 
-            long count = 0;
+                    String name =
+                            input.getText()
+                                    .toString()
+                                    .trim();
 
-            Map<String, Object> data = new HashMap<>();
-            data.put("uid", uid);
-            data.put("name", name);
-            data.put("count", count);
-            data.put("lastScan", System.currentTimeMillis());
-            data.put("readerId", readerId);
 
-            final String finalName = name;
+                    // Si no introduce nombre,
+                    // generamos uno aleatorio
+                    if (name.isEmpty()) {
 
-            db.collection("scans").document(uid)
-                    .set(data)
-                    .addOnSuccessListener(unused ->  {
-                        showEventMessage(finalName, uid, count);
-                        isProcessing = false;
-                    });
-        });
+                        name =
+                                generateRandomName();
+                    }
 
-        builder.setNegativeButton("Cancelar", (dialog, which) -> {
-            loadingOverlay.setVisibility(View.GONE);
-            isProcessing = false;
-            dialog.cancel();
-        });
+
+                    // Nueva pulsera comienza con 0
+                    long count = 0;
+
+
+                    Map<String, Object> data =
+                            new HashMap<>();
+
+
+                    data.put(
+                            "uid",
+                            uid
+                    );
+
+                    data.put(
+                            "name",
+                            name
+                    );
+
+                    data.put(
+                            "count",
+                            count
+                    );
+
+                    data.put(
+                            "lastScan",
+                            System.currentTimeMillis()
+                    );
+
+                    data.put(
+                            "readerId",
+                            readerId
+                    );
+
+
+                    final String finalName =
+                            name;
+
+
+                    db.collection("scans")
+                            .document(uid)
+                            .set(data)
+                            .addOnSuccessListener(
+                                    unused -> {
+
+                                        showEventMessage(
+                                                finalName,
+                                                uid,
+                                                count
+                                        );
+
+                                        isProcessing =
+                                                false;
+                                    }
+                            )
+                            .addOnFailureListener(
+                                    e -> {
+
+                                        showFirebaseError();
+
+                                        isProcessing =
+                                                false;
+                                    }
+                            );
+                }
+        );
+
+
+        // ----------------------------------------------------
+        // CANCELAR
+        // ----------------------------------------------------
+
+        builder.setNegativeButton(
+                "Cancelar",
+                (dialog, which) -> {
+
+                    loadingOverlay.setVisibility(
+                            View.GONE
+                    );
+
+                    isProcessing =
+                            false;
+
+                    dialog.cancel();
+                }
+        );
+
+
         builder.show();
     }
 
-    private void showEventMessage(String name, String uid, long count) {
-        loadingOverlay.setVisibility(View.GONE);
-        tvScanMessage.setText("✔ OK! Conteo: " + count);
-        tvScanMessage.setVisibility(View.VISIBLE);
 
-        tvScanDetails.setText("Name: " + name + " | UID: " + uid);
-        tvScanDetails.setVisibility(View.VISIBLE);
+    // ========================================================
+    // MOSTRAR RESULTADO
+    // ========================================================
 
-        tvLastScan.setText("Último conteo: " + count);
+    private void showEventMessage(
+            String name,
+            String uid,
+            long count) {
 
-        // Animación de fondo verde
-        rootLayout.setBackgroundColor(Color.parseColor("#A8E6A1"));
-        new Handler().postDelayed(() -> rootLayout.setBackgroundColor(Color.WHITE), 1000);
 
-        // Desaparece mensaje grande después de 2 segundos
-        new Handler().postDelayed(() -> tvScanMessage.setVisibility(View.GONE), 2000);
+        // Ocultar pantalla inicial
+        layoutWelcome.setVisibility(
+                View.GONE
+        );
+
+
+        // Ocultar loading
+        loadingOverlay.setVisibility(
+                View.GONE
+        );
+
+
+        // ----------------------------------------------------
+        // Mensaje OK
+        // ----------------------------------------------------
+
+        tvScanMessage.setText(
+                "✔ OK!\nConteo: " + count
+        );
+
+        tvScanMessage.setVisibility(
+                View.VISIBLE
+        );
+
+
+        // ----------------------------------------------------
+        // Nombre + UID
+        // ----------------------------------------------------
+
+        tvScanDetails.setText(
+                name
+                        + "\n\nUID: "
+                        + uid
+        );
+
+        tvScanDetails.setVisibility(
+                View.VISIBLE
+        );
+
+
+        // ----------------------------------------------------
+        // Último conteo
+        // ----------------------------------------------------
+
+        tvLastScan.setText(
+                "Último conteo: " + count
+        );
+
+
+        // ----------------------------------------------------
+        // Fondo verde
+        // ----------------------------------------------------
+
+        rootLayout.setBackgroundColor(
+                Color.parseColor("#A8E6A1")
+        );
+
+
+        // ----------------------------------------------------
+        // Después de 3 segundos volver a inicio
+        // ----------------------------------------------------
+
+        handler.postDelayed(
+                () -> {
+
+                    showWelcomeScreen();
+
+                },
+                3000
+        );
     }
+
+
+    // ========================================================
+    // ERROR FIREBASE
+    // ========================================================
+
+    private void showFirebaseError() {
+
+        loadingOverlay.setVisibility(
+                View.GONE
+        );
+
+        Toast.makeText(
+                MainActivity.this,
+                "Error al comunicarse con Firebase",
+                Toast.LENGTH_LONG
+        ).show();
+    }
+
+
+    // ========================================================
+    // NOMBRE ALEATORIO
+    // ========================================================
 
     private String generateRandomName() {
-        String[] names = {"Trago Loco", "Chupito Express", "Capitan Mojito", "El Destilado",
-                "Licor Loco", "Burbujitas", "Sorbitos", "Licoretas", "Ronrron", "Copita rebelde"};
-        Random rnd = new Random();
-        return names[rnd.nextInt(names.length)];
+
+        String[] names = {
+
+                "Trago Loco",
+                "Chupito Express",
+                "Capitan Mojito",
+                "El Destilado",
+                "Licor Loco",
+                "Burbujitas",
+                "Sorbitos",
+                "Licoretas",
+                "Ronrron",
+                "Copita rebelde"
+
+        };
+
+
+        Random rnd =
+                new Random();
+
+
+        return names[
+                rnd.nextInt(
+                        names.length
+                )
+                ];
     }
+
+
+    // ========================================================
+    // NFC - RESUME
+    // ========================================================
 
     @Override
     protected void onResume() {
+
         super.onResume();
+
+
         if (nfcAdapter != null) {
+
             PendingIntent pendingIntent;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                pendingIntent = PendingIntent.getActivity(
-                        this,
-                        0,
-                        new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                        PendingIntent.FLAG_MUTABLE
-                );
+
+
+            if (
+                    Build.VERSION.SDK_INT
+                            >= Build.VERSION_CODES.S
+            ) {
+
+                pendingIntent =
+                        PendingIntent.getActivity(
+                                this,
+                                0,
+                                new Intent(
+                                        this,
+                                        getClass()
+                                ).addFlags(
+                                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                ),
+                                PendingIntent.FLAG_MUTABLE
+                        );
+
             } else {
-                pendingIntent = PendingIntent.getActivity(
-                        this,
-                        0,
-                        new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                        0
-                );
+
+                pendingIntent =
+                        PendingIntent.getActivity(
+                                this,
+                                0,
+                                new Intent(
+                                        this,
+                                        getClass()
+                                ).addFlags(
+                                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                ),
+                                0
+                        );
             }
 
-            IntentFilter[] filters = new IntentFilter[]{};
-            String[][] techList = new String[][]{};
-            nfcAdapter.enableForegroundDispatch(this, pendingIntent, filters, techList);
+
+            IntentFilter[] filters =
+                    new IntentFilter[]{};
+
+
+            String[][] techList =
+                    new String[][]{};
+
+
+            nfcAdapter.enableForegroundDispatch(
+                    this,
+                    pendingIntent,
+                    filters,
+                    techList
+            );
         }
     }
 
+
+    // ========================================================
+    // NFC - PAUSE
+    // ========================================================
+
     @Override
     protected void onPause() {
+
         super.onPause();
-        if (nfcAdapter != null) nfcAdapter.disableForegroundDispatch(this);
+
+
+        if (nfcAdapter != null) {
+
+            nfcAdapter.disableForegroundDispatch(
+                    this
+            );
+        }
     }
 }
