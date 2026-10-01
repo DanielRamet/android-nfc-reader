@@ -227,9 +227,7 @@ public class MainActivity extends AppCompatActivity {
         loadingOverlay.setVisibility(View.GONE);
 
         // Fondo normal
-        rootLayout.setBackgroundColor(
-                Color.WHITE
-        );
+        rootLayout.setBackgroundResource(R.drawable.bg_initial);
     }
 
 
@@ -674,13 +672,9 @@ public class MainActivity extends AppCompatActivity {
 
 
         // ----------------------------------------------------
-        // Fondo verde
+        // Fondo
         // ----------------------------------------------------
-
-        rootLayout.setBackgroundColor(
-                Color.parseColor("#A8E6A1")
-        );
-
+        rootLayout.setBackgroundColor(Color.parseColor("#1B3B2B"));
 
         // ----------------------------------------------------
         // Después de 3 segundos volver a inicio
